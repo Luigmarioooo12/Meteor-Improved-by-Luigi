@@ -119,6 +119,13 @@ public class Freecam extends Module {
         .build()
     );
 
+    private final Setting<Boolean> teleportOnDisable = sgGeneral.add(new BoolSetting.Builder()
+        .name("teleport-on-disable")
+        .description("Teleport to your freecam position when disabling the module.")
+        .defaultValue(false)
+        .build()
+    );
+
     private final Setting<Boolean> staticView = sgGeneral.add(new BoolSetting.Builder()
         .name("static")
         .description("Disables settings that move the view.")
@@ -202,6 +209,15 @@ public class Freecam extends Module {
     public void onDeactivate() {
         if (reloadChunks.get()) {
             mc.execute(mc.worldRenderer::reload);
+        }
+
+        if (teleportOnDisable.get()) {
+            mc.player.setPosition(pos.x, pos.y, pos.z);
+            mc.player.setYaw((float) yaw);
+            mc.player.setPitch((float) pitch);
+            mc.player.setHeadYaw((float) yaw);
+            mc.player.setBodyYaw((float) yaw);
+            mc.player.setVelocity(Vec3d.ZERO);
         }
 
         mc.options.setPerspective(perspective);
