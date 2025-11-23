@@ -214,15 +214,17 @@ public class Freecam extends Module {
 
         if (teleportOnDisable.get()) {
             Vec3d targetPos = new Vec3d(pos.x, pos.y, pos.z);
-            int packetsRequired = (int) Math.ceil(mc.player.getPos().distanceTo(targetPos) / 10) - 1;
-            if (packetsRequired < 0) packetsRequired = 0;
-            if (packetsRequired > 19) packetsRequired = 19;
+            Vec3d currentPos = mc.player.getPos();
+            double distance = currentPos.distanceTo(targetPos);
+            int steps = MathHelper.clamp((int) Math.ceil(distance / 8), 0, 60);
+            Vec3d delta = targetPos.subtract(currentPos);
 
-            for (int packetNumber = 0; packetNumber < packetsRequired; packetNumber++) {
-                mc.player.networkHandler.sendPacket(new PlayerMoveC2SPacket.OnGroundOnly(true, mc.player.horizontalCollision));
+            for (int step = 1; step <= steps; step++) {
+                Vec3d intermediate = currentPos.add(delta.multiply(step / (double) (steps + 1)));
+                mc.player.networkHandler.sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(intermediate.x, intermediate.y, intermediate.z, mc.player.isOnGround(), mc.player.horizontalCollision));
             }
 
-            mc.player.networkHandler.sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(targetPos.x, targetPos.y, targetPos.z, true, mc.player.horizontalCollision));
+            mc.player.networkHandler.sendPacket(new PlayerMoveC2SPacket.Full(targetPos.x, targetPos.y, targetPos.z, (float) yaw, (float) pitch, mc.player.isOnGround(), mc.player.horizontalCollision));
             mc.player.setPosition(pos.x, pos.y, pos.z);
             mc.player.setYaw((float) yaw);
             mc.player.setPitch((float) pitch);
