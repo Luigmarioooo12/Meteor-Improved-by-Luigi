@@ -34,6 +34,7 @@ import net.minecraft.client.option.Perspective;
 import net.minecraft.client.render.Camera;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.projectile.ProjectileUtil;
+import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
 import net.minecraft.network.packet.s2c.play.DeathMessageS2CPacket;
 import net.minecraft.network.packet.s2c.play.HealthUpdateS2CPacket;
 import net.minecraft.util.hit.BlockHitResult;
@@ -212,6 +213,18 @@ public class Freecam extends Module {
         }
 
         if (teleportOnDisable.get()) {
+            Vec3d targetPos = new Vec3d(pos.x, pos.y, pos.z);
+            Vec3d currentPos = mc.player.getPos();
+            double distance = currentPos.distanceTo(targetPos);
+            int steps = MathHelper.clamp((int) Math.ceil(distance / 8), 0, 60);
+            Vec3d delta = targetPos.subtract(currentPos);
+
+            for (int step = 1; step <= steps; step++) {
+                Vec3d intermediate = currentPos.add(delta.multiply(step / (double) (steps + 1)));
+                mc.player.networkHandler.sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(intermediate.x, intermediate.y, intermediate.z, mc.player.isOnGround(), mc.player.horizontalCollision));
+            }
+
+            mc.player.networkHandler.sendPacket(new PlayerMoveC2SPacket.Full(targetPos.x, targetPos.y, targetPos.z, (float) yaw, (float) pitch, mc.player.isOnGround(), mc.player.horizontalCollision));
             mc.player.setPosition(pos.x, pos.y, pos.z);
             mc.player.setYaw((float) yaw);
             mc.player.setPitch((float) pitch);
