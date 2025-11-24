@@ -29,6 +29,7 @@ import net.minecraft.world.Heightmap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class RpcBaseFinder extends Module {
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
@@ -127,14 +128,14 @@ public class RpcBaseFinder extends Module {
         double chunkZAbs = Math.abs(pos.z * 16.0);
         if (Math.sqrt(chunkXAbs * chunkXAbs + chunkZAbs * chunkZAbs) < minimumDistance.get()) return;
 
-        int countedBlocks = 0;
-        for (var blockEntityData : packet.getBlockEntityEntries()) {
-            if (targetBlocks.get().contains(blockEntityData.type())) countedBlocks++;
-        }
+        AtomicInteger countedBlocks = new AtomicInteger();
+        packet.getChunkData().getBlockEntities(packet.getChunkX(), packet.getChunkZ()).accept((blockPos, blockEntityType, nbt) -> {
+            if (targetBlocks.get().contains(blockEntityType)) countedBlocks.incrementAndGet();
+        });
 
-        if (countedBlocks < minimumCount.get()) return;
+        if (countedBlocks.get() < minimumCount.get()) return;
 
-        handleBaseDetection(pos, countedBlocks);
+        handleBaseDetection(pos, countedBlocks.get());
     }
 
     @EventHandler
