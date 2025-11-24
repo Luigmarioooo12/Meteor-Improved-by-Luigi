@@ -22,6 +22,7 @@ import net.minecraft.block.entity.BlockEntityType;
 import net.minecraft.item.Items;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.ChunkPos;
+import net.minecraft.world.Heightmap;
 
 import java.util.HashMap;
 import java.util.List;
@@ -168,7 +169,8 @@ public class RpcBaseFinder extends Module {
             double distanceSq = mc.player.squaredDistanceTo(centerX, mc.player.getY(), centerZ);
             if (distanceSq > renderDistance.get() * renderDistance.get()) continue;
 
-            Box box = new Box(x1, mc.world.getBottomY(), z1, x2, mc.world.getTopY(), z2);
+            int topY = mc.world.getTopY(Heightmap.Type.WORLD_SURFACE, chunkPos.getStartX(), chunkPos.getStartZ());
+            Box box = new Box(x1, mc.world.getBottomY(), z1, x2, topY, z2);
             event.renderer.box(box, sides, lines, shapeMode.get(), 0);
         }
     }

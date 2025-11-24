@@ -214,7 +214,7 @@ public class Freecam extends Module {
 
         if (teleportOnDisable.get()) {
             Vec3d targetPos = new Vec3d(pos.x, pos.y, pos.z);
-            Vec3d currentPos = mc.player.getPos();
+            Vec3d currentPos = new Vec3d(mc.player.getX(), mc.player.getY(), mc.player.getZ());
             double distance = currentPos.distanceTo(targetPos);
             int steps = MathHelper.clamp((int) Math.ceil(distance / 8), 0, 60);
             Vec3d delta = targetPos.subtract(currentPos);
