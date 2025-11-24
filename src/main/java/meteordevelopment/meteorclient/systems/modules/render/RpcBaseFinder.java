@@ -21,15 +21,18 @@ import meteordevelopment.orbit.EventHandler;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.block.entity.BlockEntityType;
 import net.minecraft.item.Items;
+import net.minecraft.network.packet.s2c.play.BlockEntityUpdateS2CPacket;
 import net.minecraft.network.packet.s2c.play.ChunkDataS2CPacket;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.Heightmap;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.Set;
 
 public class RpcBaseFinder extends Module {
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
@@ -107,6 +110,7 @@ public class RpcBaseFinder extends Module {
         .build()
     );
 
+    private final Map<ChunkPos, Set<BlockPos>> countedBlockPositions = new HashMap<>();
     private final Map<ChunkPos, Integer> foundBases = new HashMap<>();
 
     public RpcBaseFinder() {
@@ -115,46 +119,55 @@ public class RpcBaseFinder extends Module {
 
     @Override
     public void onActivate() {
+        countedBlockPositions.clear();
         foundBases.clear();
     }
 
     @EventHandler
     private void onPacketReceive(PacketEvent.Receive event) {
-        if (!(event.packet instanceof ChunkDataS2CPacket packet)) return;
+        if (event.packet instanceof ChunkDataS2CPacket packet) {
+            ChunkPos pos = new ChunkPos(packet.getChunkX(), packet.getChunkZ());
 
-        ChunkPos pos = new ChunkPos(packet.getChunkX(), packet.getChunkZ());
+            if (withinMinimumDistance(pos)) return;
 
-        double chunkXAbs = Math.abs(pos.x * 16.0);
-        double chunkZAbs = Math.abs(pos.z * 16.0);
-        if (Math.sqrt(chunkXAbs * chunkXAbs + chunkZAbs * chunkZAbs) < minimumDistance.get()) return;
+            Set<BlockPos> chunkBlockEntities = countedBlockPositions.computeIfAbsent(pos, p -> new HashSet<>());
+            chunkBlockEntities.clear();
 
-        AtomicInteger countedBlocks = new AtomicInteger();
-        packet.getChunkData().getBlockEntities(packet.getChunkX(), packet.getChunkZ()).accept((blockPos, blockEntityType, nbt) -> {
-            if (targetBlocks.get().contains(blockEntityType)) countedBlocks.incrementAndGet();
-        });
+            packet.getChunkData().getBlockEntities(packet.getChunkX(), packet.getChunkZ()).accept((blockPos, blockEntityType, nbt) -> {
+                trackBlockEntity(pos, blockPos, blockEntityType, chunkBlockEntities);
+            });
 
-        if (countedBlocks.get() < minimumCount.get()) return;
+            if (chunkBlockEntities.size() < minimumCount.get()) return;
 
-        handleBaseDetection(pos, countedBlocks.get());
+            handleBaseDetection(pos, chunkBlockEntities.size());
+        }
+
+        if (!(event.packet instanceof BlockEntityUpdateS2CPacket blockEntityUpdate)) return;
+
+        ChunkPos pos = new ChunkPos(blockEntityUpdate.getPos());
+
+        if (withinMinimumDistance(pos)) return;
+
+        Set<BlockPos> chunkBlockEntities = countedBlockPositions.computeIfAbsent(pos, p -> new HashSet<>());
+        trackBlockEntity(pos, blockEntityUpdate.getPos(), blockEntityUpdate.getBlockEntityType(), chunkBlockEntities);
     }
 
     @EventHandler
     private void onChunkData(ChunkDataEvent event) {
         if (event.chunk() == null || mc.world == null) return;
 
-        double chunkXAbs = Math.abs(event.chunk().getPos().x * 16.0);
-        double chunkZAbs = Math.abs(event.chunk().getPos().z * 16.0);
-        if (Math.sqrt(chunkXAbs * chunkXAbs + chunkZAbs * chunkZAbs) < minimumDistance.get()) return;
+        if (withinMinimumDistance(event.chunk().getPos())) return;
 
-        int countedBlocks = 0;
+        Set<BlockPos> chunkBlockEntities = countedBlockPositions.computeIfAbsent(event.chunk().getPos(), p -> new HashSet<>());
+        chunkBlockEntities.clear();
+
         for (BlockEntity blockEntity : event.chunk().getBlockEntities().values()) {
-            if (!targetBlocks.get().contains(blockEntity.getType())) continue;
-            countedBlocks++;
+            trackBlockEntity(event.chunk().getPos(), blockEntity.getPos(), blockEntity.getType(), chunkBlockEntities);
         }
 
-        if (countedBlocks < minimumCount.get()) return;
+        if (chunkBlockEntities.size() < minimumCount.get()) return;
 
-        handleBaseDetection(event.chunk().getPos(), countedBlocks);
+        handleBaseDetection(event.chunk().getPos(), chunkBlockEntities.size());
     }
 
     @EventHandler
@@ -199,6 +212,22 @@ public class RpcBaseFinder extends Module {
                 mc.getToastManager().add(toast);
             }
         }
+    }
+
+    private void trackBlockEntity(ChunkPos chunkPos, BlockPos blockPos, BlockEntityType<?> type, Set<BlockPos> chunkBlockEntities) {
+        if (!targetBlocks.get().contains(type)) return;
+
+        if (!chunkBlockEntities.contains(blockPos)) chunkBlockEntities.add(blockPos.toImmutable());
+
+        if (chunkBlockEntities.size() < minimumCount.get()) return;
+
+        handleBaseDetection(chunkPos, chunkBlockEntities.size());
+    }
+
+    private boolean withinMinimumDistance(ChunkPos pos) {
+        double chunkXAbs = Math.abs(pos.x * 16.0);
+        double chunkZAbs = Math.abs(pos.z * 16.0);
+        return Math.sqrt(chunkXAbs * chunkXAbs + chunkZAbs * chunkZAbs) < minimumDistance.get();
     }
 
     public enum Mode {
