@@ -1,5 +1,6 @@
 package meteordevelopment.meteorclient.systems.modules.render;
 
+import meteordevelopment.meteorclient.events.packets.PacketEvent;
 import meteordevelopment.meteorclient.events.render.Render3DEvent;
 import meteordevelopment.meteorclient.events.world.ChunkDataEvent;
 import meteordevelopment.meteorclient.renderer.ShapeMode;
@@ -20,6 +21,7 @@ import meteordevelopment.orbit.EventHandler;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.block.entity.BlockEntityType;
 import net.minecraft.item.Items;
+import net.minecraft.network.packet.s2c.play.ChunkDataS2CPacket;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.Heightmap;
@@ -116,6 +118,26 @@ public class RpcBaseFinder extends Module {
     }
 
     @EventHandler
+    private void onPacketReceive(PacketEvent.Receive event) {
+        if (!(event.packet instanceof ChunkDataS2CPacket packet)) return;
+
+        ChunkPos pos = new ChunkPos(packet.getChunkX(), packet.getChunkZ());
+
+        double chunkXAbs = Math.abs(pos.x * 16.0);
+        double chunkZAbs = Math.abs(pos.z * 16.0);
+        if (Math.sqrt(chunkXAbs * chunkXAbs + chunkZAbs * chunkZAbs) < minimumDistance.get()) return;
+
+        int countedBlocks = 0;
+        for (var blockEntityData : packet.getBlockEntityEntries()) {
+            if (targetBlocks.get().contains(blockEntityData.type())) countedBlocks++;
+        }
+
+        if (countedBlocks < minimumCount.get()) return;
+
+        handleBaseDetection(pos, countedBlocks);
+    }
+
+    @EventHandler
     private void onChunkData(ChunkDataEvent event) {
         if (event.chunk() == null || mc.world == null) return;
 
@@ -131,23 +153,7 @@ public class RpcBaseFinder extends Module {
 
         if (countedBlocks < minimumCount.get()) return;
 
-        ChunkPos pos = event.chunk().getPos();
-        Integer previous = foundBases.put(pos, countedBlocks);
-
-        if (notify.get() && (previous == null || previous != countedBlocks)) {
-            switch (notificationMode.get()) {
-                case Chat -> info("(highlight)Base(default) gefunden bei (highlight)%s(default), (highlight)%s(default) mit (highlight)%d(default) Block-Entitaeten.", pos.x, pos.z, countedBlocks);
-                case Toast -> {
-                    MeteorToast toast = new MeteorToast.Builder(title).icon(Items.RED_BED).text("Base entdeckt!").build();
-                    mc.getToastManager().add(toast);
-                }
-                case Both -> {
-                    info("(highlight)Base(default) gefunden bei (highlight)%s(default), (highlight)%s(default) mit (highlight)%d(default) Block-Entitaeten.", pos.x, pos.z, countedBlocks);
-                    MeteorToast toast = new MeteorToast.Builder(title).icon(Items.RED_BED).text("Base entdeckt!").build();
-                    mc.getToastManager().add(toast);
-                }
-            }
-        }
+        handleBaseDetection(event.chunk().getPos(), countedBlocks);
     }
 
     @EventHandler
@@ -172,6 +178,25 @@ public class RpcBaseFinder extends Module {
             int topY = mc.world.getTopY(Heightmap.Type.WORLD_SURFACE, chunkPos.getStartX(), chunkPos.getStartZ());
             Box box = new Box(x1, mc.world.getBottomY(), z1, x2, topY, z2);
             event.renderer.box(box, sides, lines, shapeMode.get(), 0);
+        }
+    }
+
+    private void handleBaseDetection(ChunkPos pos, int countedBlocks) {
+        Integer previous = foundBases.put(pos, countedBlocks);
+
+        if (!notify.get() || (previous != null && previous == countedBlocks)) return;
+
+        switch (notificationMode.get()) {
+            case Chat -> info("(highlight)Base(default) gefunden bei (highlight)%s(default), (highlight)%s(default) mit (highlight)%d(default) Block-Entitaeten.", pos.x, pos.z, countedBlocks);
+            case Toast -> {
+                MeteorToast toast = new MeteorToast.Builder(title).icon(Items.RED_BED).text("Base entdeckt!").build();
+                mc.getToastManager().add(toast);
+            }
+            case Both -> {
+                info("(highlight)Base(default) gefunden bei (highlight)%s(default), (highlight)%s(default) mit (highlight)%d(default) Block-Entitaeten.", pos.x, pos.z, countedBlocks);
+                MeteorToast toast = new MeteorToast.Builder(title).icon(Items.RED_BED).text("Base entdeckt!").build();
+                mc.getToastManager().add(toast);
+            }
         }
     }
 
