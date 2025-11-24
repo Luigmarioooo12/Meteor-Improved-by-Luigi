@@ -9,6 +9,6 @@ pluginManagement {
     }
 }
 
-rootProject.name = "meteor-client"
+rootProject.name = "warden-cheat"
 
 include("launch")
