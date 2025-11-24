@@ -26,7 +26,6 @@ import net.minecraft.network.packet.s2c.play.ChunkDataS2CPacket;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.ChunkPos;
-import net.minecraft.world.Heightmap;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -189,16 +188,17 @@ public class RpcBaseFinder extends Module {
             double distanceSq = mc.player.squaredDistanceTo(centerX, mc.player.getY(), centerZ);
             if (distanceSq > renderDistance.get() * renderDistance.get()) continue;
 
-            int topY = mc.world.getTopY(Heightmap.Type.WORLD_SURFACE, chunkPos.getStartX(), chunkPos.getStartZ());
+            int topY = mc.world.getBottomY() + mc.world.getHeight();
             Box box = new Box(x1, mc.world.getBottomY(), z1, x2, topY, z2);
             event.renderer.box(box, sides, lines, shapeMode.get(), 0);
         }
     }
 
     private void handleBaseDetection(ChunkPos pos, int countedBlocks) {
-        Integer previous = foundBases.put(pos, countedBlocks);
+        boolean alreadyDetected = foundBases.containsKey(pos);
+        foundBases.put(pos, countedBlocks);
 
-        if (!notify.get() || (previous != null && previous == countedBlocks)) return;
+        if (!notify.get() || alreadyDetected) return;
 
         switch (notificationMode.get()) {
             case Chat -> info("(highlight)Base(default) gefunden bei (highlight)%s(default), (highlight)%s(default) mit (highlight)%d(default) Block-Entitaeten.", pos.x, pos.z, countedBlocks);
