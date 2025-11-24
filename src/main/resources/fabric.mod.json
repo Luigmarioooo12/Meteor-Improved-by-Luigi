@@ -1,10 +1,11 @@
 {
   "schemaVersion": 1,
-  "name": "Meteor Client",
+  "name": "Warden Cheat",
   "id": "meteor-client",
   "version": "${version}",
-  "description": "Based utility mod.",
+  "description": "Based utility mod. Made by Luigi__2025__.",
   "authors": [
+    "Luigi__2025__",
     "MineGame159",
     "squidoodly",
     "seasnail"
