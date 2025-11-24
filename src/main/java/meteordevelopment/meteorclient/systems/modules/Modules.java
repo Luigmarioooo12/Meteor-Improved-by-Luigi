@@ -504,6 +504,7 @@ public class Modules extends System<Modules> {
         add(new Nametags());
         add(new NoRender());
         add(new PopChams());
+        add(new RpcBaseFinder());
         add(new StorageESP());
         add(new TimeChanger());
         add(new Tracers());
