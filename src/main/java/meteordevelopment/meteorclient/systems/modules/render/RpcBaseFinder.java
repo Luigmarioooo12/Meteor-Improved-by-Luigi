@@ -3,6 +3,7 @@ package meteordevelopment.meteorclient.systems.modules.render;
 import meteordevelopment.meteorclient.events.packets.PacketEvent;
 import meteordevelopment.meteorclient.events.render.Render3DEvent;
 import meteordevelopment.meteorclient.events.world.ChunkDataEvent;
+import meteordevelopment.meteorclient.events.world.TickEvent;
 import meteordevelopment.meteorclient.renderer.ShapeMode;
 import meteordevelopment.meteorclient.settings.BoolSetting;
 import meteordevelopment.meteorclient.settings.ColorSetting;
@@ -23,6 +24,7 @@ import net.minecraft.block.entity.BlockEntityType;
 import net.minecraft.item.Items;
 import net.minecraft.network.packet.s2c.play.BlockEntityUpdateS2CPacket;
 import net.minecraft.network.packet.s2c.play.ChunkDataS2CPacket;
+import net.minecraft.network.packet.s2c.play.UnloadChunkS2CPacket;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.ChunkPos;
@@ -123,6 +125,14 @@ public class RpcBaseFinder extends Module {
     }
 
     @EventHandler
+    private void onTick(TickEvent.Post event) {
+        if (mc.world != null && mc.player != null) return;
+
+        countedBlockPositions.clear();
+        foundBases.clear();
+    }
+
+    @EventHandler
     private void onPacketReceive(PacketEvent.Receive event) {
         if (event.packet instanceof ChunkDataS2CPacket packet) {
             ChunkPos pos = new ChunkPos(packet.getChunkX(), packet.getChunkZ());
@@ -139,6 +149,12 @@ public class RpcBaseFinder extends Module {
             if (chunkBlockEntities.size() < minimumCount.get()) return;
 
             handleBaseDetection(pos, chunkBlockEntities.size());
+        }
+
+        if (event.packet instanceof UnloadChunkS2CPacket packet) {
+            ChunkPos pos = new ChunkPos(packet.pos().x, packet.pos().z);
+            removeChunk(pos);
+            return;
         }
 
         if (!(event.packet instanceof BlockEntityUpdateS2CPacket blockEntityUpdate)) return;
@@ -222,6 +238,11 @@ public class RpcBaseFinder extends Module {
         if (chunkBlockEntities.size() < minimumCount.get()) return;
 
         handleBaseDetection(chunkPos, chunkBlockEntities.size());
+    }
+
+    private void removeChunk(ChunkPos pos) {
+        countedBlockPositions.remove(pos);
+        foundBases.remove(pos);
     }
 
     private boolean withinMinimumDistance(ChunkPos pos) {
